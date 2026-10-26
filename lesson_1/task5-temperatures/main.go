@@ -18,6 +18,6 @@ func main() {
 			label = "жарко"
 		}
 
-		fmt.Printf("%4d°C = %6.1f°F  %s\n", c, f, label)
+		fmt.Printf("%3d°C = %5.1f°F  %s\n", c, f, label)
 	}
 }

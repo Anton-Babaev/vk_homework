@@ -1,35 +1,49 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
-func main() {
-	total := 93784
+const (
+	secondsInMinute = 60
+	minutesInHour   = 60
+	hoursInDay      = 24
+	secondsInHour   = minutesInHour * secondsInMinute
+	secondsInDay    = hoursInDay * secondsInHour
+)
 
-	// Особый случай: ноль. Без этой проверки все if ниже ложны,
-	// и выведется пустая строка вместо "0с".
+func printUptime(total int) {
 	if total == 0 {
 		fmt.Println("0с")
 		return
 	}
 
-	// Целочисленное деление и остаток.
-	// 86400 — секунд в сутках, 3600 — в часе, 60 — в минуте.
-	days := total / 86400           // целых дней
-	hours := (total % 86400) / 3600 // остаток -> часы
-	minutes := (total % 3600) / 60  // остаток -> минуты
-	seconds := total % 60           // остаток -> секунды
+	days := total / secondsInDay
+	hours := (total % secondsInDay) / secondsInHour
+	minutes := (total % secondsInHour) / secondsInMinute
+	seconds := total % secondsInMinute
 
+	var parts []string
 	if days > 0 {
-		fmt.Printf("%dд ", days)
+		parts = append(parts, fmt.Sprintf("%dд", days))
 	}
 	if hours > 0 {
-		fmt.Printf("%dч ", hours)
+		parts = append(parts, fmt.Sprintf("%dч", hours))
 	}
 	if minutes > 0 {
-		fmt.Printf("%dм ", minutes)
+		parts = append(parts, fmt.Sprintf("%dм", minutes))
 	}
 	if seconds > 0 {
-		fmt.Printf("%dс", seconds)
+		parts = append(parts, fmt.Sprintf("%dс", seconds))
 	}
-	fmt.Println()
+	fmt.Println(strings.Join(parts, " "))
+}
+
+func main() {
+	printUptime(93784)
+	printUptime(86405)
+	printUptime(3600)
+	printUptime(59)
+	printUptime(0)
 }

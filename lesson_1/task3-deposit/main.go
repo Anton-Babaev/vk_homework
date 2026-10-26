@@ -3,22 +3,24 @@ package main
 import "fmt"
 
 const (
-	Initial    = 100000.0
-	AnnualRate = 0.12
+	initialDeposit = 100000.0
+	annualRate     = 0.12
+	periodsPerYear = 12 // Периоды капитализации
+	periodToShow   = 12 // Количество показываемых преиодов
 )
 
 func main() {
-	balance := Initial
-	monthlyRate := AnnualRate / 12
+	balance := initialDeposit
+	monthlyRate := annualRate / periodsPerYear
 
-	for month := 1; month <= 12; month++ {
+	for month := 1; month <= periodToShow; month++ {
 		balance *= (1 + monthlyRate)
 		fmt.Printf("месяц %2d: %.2f\n", month, balance)
 	}
 
-	balance = Initial
+	balance = initialDeposit
 	months := 0
-	for balance < Initial*2 {
+	for balance < initialDeposit*2 {
 		balance *= (1 + monthlyRate)
 		months++
 	}

@@ -31,14 +31,11 @@ func (s CustomerStatus) String() string {
 }
 
 const (
-	DeliveryPrice   = 299.0
-	FreeDeliveryMin = 3000.0
+	deliveryPrice   = 299.0
+	freeDeliveryMin = 3000.0
 )
 
-func main() {
-	amount := 4500.0
-	status := Gold
-
+func PritOrder(amount float64, status CustomerStatus) {
 	var discount float64
 	switch status {
 	case Regular:
@@ -48,14 +45,13 @@ func main() {
 	case Gold:
 		discount = amount * 0.10
 	default:
-		fmt.Println("неизвестный статус")
 		discount = 0
 	}
 
 	afterDiscount := amount - discount
 
-	delivery := DeliveryPrice
-	if afterDiscount >= FreeDeliveryMin {
+	delivery := deliveryPrice
+	if afterDiscount >= freeDeliveryMin {
 		delivery = 0
 	}
 
@@ -65,4 +61,13 @@ func main() {
 	fmt.Printf("Скидка: %.2f\n", discount)
 	fmt.Printf("Доставка: %.2f\n", delivery)
 	fmt.Printf("Итого: %.2f\n", total)
+}
+
+func main() {
+	PritOrder(4500, Gold)
+	fmt.Println()
+	PritOrder(2900, Silver)
+	fmt.Println()
+	PritOrder(1000, Regular)
+	fmt.Println()
 }
