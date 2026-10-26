@@ -6,7 +6,7 @@ const (
 	initialDeposit = 100000.0
 	annualRate     = 0.12
 	periodsPerYear = 12 // Периоды капитализации
-	periodToShow   = 12 // Количество показываемых преиодов
+	periodToShow   = 12 // Количество показываемых периодов
 )
 
 func main() {

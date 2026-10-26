@@ -2,21 +2,14 @@ package main
 
 import "fmt"
 
-// CustomerStatus — свой тип на базе int.
-// Не алиас (= int), а новый именованный тип: нельзя случайно
-// передать обычный int туда, где ожидается CustomerStatus.
 type CustomerStatus int
 
-// Константы статусов через iota: Regular = 0, Silver = 1, Gold = 2.
-// iota — счётчик строк в блоке const, начинается с 0.
 const (
 	Regular CustomerStatus = iota
 	Silver
 	Gold
 )
 
-// String реализует интерфейс fmt.Stringer неявно: достаточно
-// метода String() string — и fmt будет печатать "Gold", а не 2.
 func (s CustomerStatus) String() string {
 	switch s {
 	case Regular:
@@ -26,7 +19,7 @@ func (s CustomerStatus) String() string {
 	case Gold:
 		return "Gold"
 	default:
-		return "Unknown"
+		return "Неизвестный статус"
 	}
 }
 
@@ -35,7 +28,7 @@ const (
 	freeDeliveryMin = 3000.0
 )
 
-func PritOrder(amount float64, status CustomerStatus) {
+func printOrder(amount float64, status CustomerStatus) {
 	var discount float64
 	switch status {
 	case Regular:
@@ -64,10 +57,10 @@ func PritOrder(amount float64, status CustomerStatus) {
 }
 
 func main() {
-	PritOrder(4500, Gold)
+	printOrder(4500, Gold)
 	fmt.Println()
-	PritOrder(2900, Silver)
+	printOrder(2900, Silver)
 	fmt.Println()
-	PritOrder(1000, Regular)
+	printOrder(1000, Regular)
 	fmt.Println()
 }
