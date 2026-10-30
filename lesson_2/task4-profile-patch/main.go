@@ -58,5 +58,5 @@ func main() {
 	fmt.Println("ApplyPatch(nil, ...) не упал")
 
 	fmt.Println("Вопрос: почему в патче нельзя просто объявить Newsletter bool?")
-	fmt.Println("Ответ: потосу что у bool всего 2 состояния, а нам надо 3")
+	fmt.Println("Ответ: потому что у bool всего 2 состояния, а нам надо 3")
 }
