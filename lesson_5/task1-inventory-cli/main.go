@@ -71,3 +71,56 @@ var (
 	_ Item = (*Armor)(nil)
 	_ Item = (*Potion)(nil)
 )
+
+func isNil(i Item) bool {
+	if i == nil {
+		return true
+	}
+	switch v := i.(type) {
+	case *Weapon:
+		return v == nil
+	case *Armor:
+		return v == nil
+	case *Potion:
+		return v == nil
+	}
+	return false
+}
+
+func DescribeItem(i Item) string {
+	if isNil(i) {
+		return "Предмет отсутствует"
+	}
+	return fmt.Sprintf("%s (вес: %.2f)", i.Name(), i.Weight())
+}
+
+func Filter[T any](items []T, predicate func(T) bool) []T {
+	// Не до конца разобрался как это работает
+	result := make([]T, 0, len(items))
+	for _, item := range items {
+		if predicate(item) {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func Map[T any, R any](items []T, transform func(T) R) []R {
+	// Не до конца разобрался как это работает
+	result := make([]R, 0, len(items))
+	for _, item := range items {
+		result = append(result, transform(item))
+	}
+	return result
+}
+
+func Find[T any](items []T, condition func(T) bool) (T, bool) {
+	// Не до конца разобрался как это работает
+	for _, item := range items {
+		if condition(item) {
+			return item, true
+		}
+	}
+	var zero T
+	return zero, false
+}
