@@ -95,7 +95,7 @@ func DescribeItem(i Item) string {
 }
 
 func Filter[T any](items []T, predicate func(T) bool) []T {
-	// Не до конца разобрался как это работает
+	// Не до конца разобрался с сигнатурой функции
 	result := make([]T, 0, len(items))
 	for _, item := range items {
 		if predicate(item) {
@@ -106,7 +106,7 @@ func Filter[T any](items []T, predicate func(T) bool) []T {
 }
 
 func Map[T any, R any](items []T, transform func(T) R) []R {
-	// Не до конца разобрался как это работает
+	// Не до конца разобрался с сигнатурой
 	result := make([]R, 0, len(items))
 	for _, item := range items {
 		result = append(result, transform(item))
@@ -115,7 +115,7 @@ func Map[T any, R any](items []T, transform func(T) R) []R {
 }
 
 func Find[T any](items []T, condition func(T) bool) (T, bool) {
-	// Не до конца разобрался как это работает
+	// Не до конца разобрался с сигнатурой
 	for _, item := range items {
 		if condition(item) {
 			return item, true
@@ -123,4 +123,99 @@ func Find[T any](items []T, condition func(T) bool) (T, bool) {
 	}
 	var zero T
 	return zero, false
+}
+
+type Inventory struct {
+	Items  []Item
+	nextID int
+}
+
+func NewInventory() *Inventory {
+	return &Inventory{nextID: 1}
+}
+
+func (inv *Inventory) AddItem(item Item) int {
+	id := inv.nextID
+	inv.nextID++
+	switch v := item.(type) {
+	case *Weapon:
+		v.ID = id
+	case *Armor:
+		v.ID = id
+	case *Potion:
+		v.ID = id
+	}
+	inv.Items = append(inv.Items, item)
+	return id
+}
+
+func (inv *Inventory) FindByID(id int) (Item, bool) {
+	for _, item := range inv.Items {
+		var itemID int
+		switch v := item.(type) {
+		case *Weapon:
+			itemID = v.ID
+		case *Armor:
+			itemID = v.ID
+		case *Potion:
+			itemID = v.ID
+		}
+		if itemID == id {
+			return item, true
+		}
+	}
+	return nil, false
+}
+
+func (inv *Inventory) DeleteByID(id int) bool {
+	for i, item := range inv.Items {
+		var itemID int
+		switch v := item.(type) {
+		case *Weapon:
+			itemID = v.ID
+		case *Armor:
+			itemID = v.ID
+		case *Potion:
+			itemID = v.ID
+		}
+		if itemID == id {
+			inv.Items = append(inv.Items[:i], inv.Items[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (inv *Inventory) Weapons() []*Weapon {
+	filtered := Filter(inv.Items, func(i Item) bool {
+		_, ok := i.(*Weapon)
+		return ok
+	})
+	return Map(filtered, func(i Item) *Weapon {
+		return i.(*Weapon)
+	})
+}
+
+func (inv *Inventory) BrokenItems() []Item {
+	return Filter(inv.Items, func(i Item) bool {
+		switch v := i.(type) {
+		case *Weapon:
+			return v.Durability <= 0
+		case *Potion:
+			return v.Charges <= 0
+		}
+		return false
+	})
+}
+
+func (inv *Inventory) ItemNames() []string {
+	return Map(inv.Items, func(i Item) string {
+		return i.Name()
+	})
+}
+
+func (inv *Inventory) FindItemByName(name string) (Item, bool) {
+	return Find(inv.Items, func(i Item) bool {
+		return i.Name() == name
+	})
 }
