@@ -38,7 +38,7 @@ func (e *ParseItemError) Error() string {
 func (e *ParseItemError) Unwrap() error { return e.Err }
 
 // ============================================================
-// 3. Интерфейс Item
+// 3. Интерфейсы
 // ============================================================
 
 type Item interface {
@@ -49,10 +49,19 @@ type Item interface {
 	SetID(int)
 }
 
+// Storable — контракт сохранения/загрузки предмета (из ДЗ4).
+type Storable interface {
+	Serialize(w io.Writer) error
+	Deserialize(line string) error
+}
+
 var (
-	_ Item = (*Weapon)(nil)
-	_ Item = (*Armor)(nil)
-	_ Item = (*Potion)(nil)
+	_ Item     = (*Weapon)(nil)
+	_ Item     = (*Armor)(nil)
+	_ Item     = (*Potion)(nil)
+	_ Storable = (*Weapon)(nil)
+	_ Storable = (*Armor)(nil)
+	_ Storable = (*Potion)(nil)
 )
 
 // ============================================================
@@ -80,11 +89,49 @@ func (w *Weapon) Use() (string, error) {
 	return fmt.Sprintf("Взял %s (урон %d, прочность %d)", w.name, w.Damage, w.Durability), nil
 }
 
+func (w *Weapon) Serialize(out io.Writer) error {
+	if _, err := fmt.Fprintf(out, "Weapon|%d|%s|%d|%d|%.2f\n",
+		w.id, w.name, w.Damage, w.Durability, w.weight); err != nil {
+		return fmt.Errorf("Weapon: %w", err)
+	}
+	return nil
+}
+
+func (w *Weapon) Deserialize(line string) error {
+	parts := strings.Split(line, "|")
+	if len(parts) != 6 {
+		return fmt.Errorf("Weapon: ожидалось 6 полей, получено %d", len(parts))
+	}
+	id, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return fmt.Errorf("Weapon id: %w", err)
+	}
+	damage, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return fmt.Errorf("Weapon Damage: %w", err)
+	}
+	dur, err := strconv.Atoi(parts[4])
+	if err != nil {
+		return fmt.Errorf("Weapon Durability: %w", err)
+	}
+	weight, err := strconv.ParseFloat(parts[5], 64)
+	if err != nil {
+		return fmt.Errorf("Weapon weight: %w", err)
+	}
+	w.id = id
+	w.name = parts[2]
+	w.Damage = damage
+	w.Durability = dur
+	w.weight = weight
+	return nil
+}
+
 type Armor struct {
-	id      int
-	name    string
-	weight  float64
-	Defense int
+	id         int
+	name       string
+	weight     float64
+	Defense    int
+	Durability int
 }
 
 func (a *Armor) Name() string    { return a.name }
@@ -93,7 +140,48 @@ func (a *Armor) ID() int         { return a.id }
 func (a *Armor) SetID(id int)    { a.id = id }
 
 func (a *Armor) Use() (string, error) {
-	return fmt.Sprintf("Надел %s (защита %d)", a.name, a.Defense), nil
+	if a.Durability <= 0 {
+		return "", fmt.Errorf("броня %q сломана: %w", a.name, ErrBroken)
+	}
+	a.Durability--
+	return fmt.Sprintf("Надел %s (защита %d, прочность %d)", a.name, a.Defense, a.Durability), nil
+}
+
+func (a *Armor) Serialize(out io.Writer) error {
+	if _, err := fmt.Fprintf(out, "Armor|%d|%s|%d|%d|%.2f\n",
+		a.id, a.name, a.Defense, a.Durability, a.weight); err != nil {
+		return fmt.Errorf("Armor: %w", err)
+	}
+	return nil
+}
+
+func (a *Armor) Deserialize(line string) error {
+	parts := strings.Split(line, "|")
+	if len(parts) != 6 {
+		return fmt.Errorf("Armor: ожидалось 6 полей, получено %d", len(parts))
+	}
+	id, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return fmt.Errorf("Armor id: %w", err)
+	}
+	defense, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return fmt.Errorf("Armor Defense: %w", err)
+	}
+	dur, err := strconv.Atoi(parts[4])
+	if err != nil {
+		return fmt.Errorf("Armor Durability: %w", err)
+	}
+	weight, err := strconv.ParseFloat(parts[5], 64)
+	if err != nil {
+		return fmt.Errorf("Armor weight: %w", err)
+	}
+	a.id = id
+	a.name = parts[2]
+	a.Defense = defense
+	a.Durability = dur
+	a.weight = weight
+	return nil
 }
 
 type Potion struct {
@@ -117,8 +205,41 @@ func (p *Potion) Use() (string, error) {
 	return fmt.Sprintf("Выпил %s (эффект: %s, осталось зарядов: %d)", p.name, p.Effect, p.Charges), nil
 }
 
+func (p *Potion) Serialize(out io.Writer) error {
+	if _, err := fmt.Fprintf(out, "Potion|%d|%s|%s|%d|%.2f\n",
+		p.id, p.name, p.Effect, p.Charges, p.weight); err != nil {
+		return fmt.Errorf("Potion: %w", err)
+	}
+	return nil
+}
+
+func (p *Potion) Deserialize(line string) error {
+	parts := strings.Split(line, "|")
+	if len(parts) != 6 {
+		return fmt.Errorf("Potion: ожидалось 6 полей, получено %d", len(parts))
+	}
+	id, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return fmt.Errorf("Potion id: %w", err)
+	}
+	charges, err := strconv.Atoi(parts[4])
+	if err != nil {
+		return fmt.Errorf("Potion Charges: %w", err)
+	}
+	weight, err := strconv.ParseFloat(parts[5], 64)
+	if err != nil {
+		return fmt.Errorf("Potion weight: %w", err)
+	}
+	p.id = id
+	p.name = parts[2]
+	p.Effect = parts[3]
+	p.Charges = charges
+	p.weight = weight
+	return nil
+}
+
 // ============================================================
-// 5. DescribeItem
+// 5. DescribeItem (из ДЗ4)
 // ============================================================
 
 func DescribeItem(i Item) string {
@@ -143,7 +264,7 @@ func DescribeItem(i Item) string {
 }
 
 // ============================================================
-// 6. Обобщённые функции
+// 6. Обобщённые функции (из ДЗ4)
 // ============================================================
 
 func Filter[T any](items []T, predicate func(T) bool) []T {
@@ -222,6 +343,8 @@ func (inv *Inventory) BrokenItems() []Item {
 		switch v := i.(type) {
 		case *Weapon:
 			return v.Durability <= 0
+		case *Armor:
+			return v.Durability <= 0
 		case *Potion:
 			return v.Charges <= 0
 		}
@@ -238,26 +361,15 @@ func (inv *Inventory) FindItemByName(name string) (Item, bool) {
 }
 
 // ============================================================
-// 8. Сериализация
+// 8. Сериализация — тонкие обёртки над Storable
 // ============================================================
 
 func serialize(w io.Writer, item Item) error {
-	switch v := item.(type) {
-	case *Weapon:
-		_, err := fmt.Fprintf(w, "Weapon|%d|%s|%d|%d|%.2f\n",
-			v.id, v.name, v.Damage, v.Durability, v.weight)
-		return err
-	case *Armor:
-		_, err := fmt.Fprintf(w, "Armor|%d|%s|%d|%.2f\n",
-			v.id, v.name, v.Defense, v.weight)
-		return err
-	case *Potion:
-		_, err := fmt.Fprintf(w, "Potion|%d|%s|%s|%d|%.2f\n",
-			v.id, v.name, v.Effect, v.Charges, v.weight)
-		return err
-	default:
-		return fmt.Errorf("неизвестный тип: %T", item)
+	s, ok := item.(Storable)
+	if !ok {
+		return fmt.Errorf("тип %T не реализует Storable", item)
 	}
+	return s.Serialize(w)
 }
 
 func parseItemLine(line string) (Item, error) {
@@ -265,74 +377,43 @@ func parseItemLine(line string) (Item, error) {
 	if len(parts) < 2 {
 		return nil, fmt.Errorf("ожидалось минимум 2 поля, получено %d", len(parts))
 	}
+	var item Item
 	switch parts[0] {
 	case "Weapon":
-		if len(parts) != 6 {
-			return nil, fmt.Errorf("Weapon: ожидалось 6 полей, получено %d", len(parts))
-		}
-		id, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("Weapon id: %w", err)
-		}
-		damage, err := strconv.Atoi(parts[3])
-		if err != nil {
-			return nil, fmt.Errorf("Weapon Damage: %w", err)
-		}
-		dur, err := strconv.Atoi(parts[4])
-		if err != nil {
-			return nil, fmt.Errorf("Weapon Durability: %w", err)
-		}
-		weight, err := strconv.ParseFloat(parts[5], 64)
-		if err != nil {
-			return nil, fmt.Errorf("Weapon weight: %w", err)
-		}
-		return &Weapon{id: id, name: parts[2], Damage: damage, Durability: dur, weight: weight}, nil
+		item = &Weapon{}
 	case "Armor":
-		if len(parts) != 5 {
-			return nil, fmt.Errorf("Armor: ожидалось 5 полей, получено %d", len(parts))
-		}
-		id, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("Armor id: %w", err)
-		}
-		defense, err := strconv.Atoi(parts[3])
-		if err != nil {
-			return nil, fmt.Errorf("Armor Defense: %w", err)
-		}
-		weight, err := strconv.ParseFloat(parts[4], 64)
-		if err != nil {
-			return nil, fmt.Errorf("Armor weight: %w", err)
-		}
-		return &Armor{id: id, name: parts[2], Defense: defense, weight: weight}, nil
+		item = &Armor{}
 	case "Potion":
-		if len(parts) != 6 {
-			return nil, fmt.Errorf("Potion: ожидалось 6 полей, получено %d", len(parts))
-		}
-		id, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("Potion id: %w", err)
-		}
-		charges, err := strconv.Atoi(parts[4])
-		if err != nil {
-			return nil, fmt.Errorf("Potion Charges: %w", err)
-		}
-		weight, err := strconv.ParseFloat(parts[5], 64)
-		if err != nil {
-			return nil, fmt.Errorf("Potion weight: %w", err)
-		}
-		return &Potion{id: id, name: parts[2], Effect: parts[3], Charges: charges, weight: weight}, nil
+		item = &Potion{}
 	default:
 		return nil, fmt.Errorf("неизвестный тип: %q", parts[0])
 	}
+	s, ok := item.(Storable)
+	if !ok {
+		return nil, fmt.Errorf("тип %T не реализует Storable", item)
+	}
+	if err := s.Deserialize(line); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 // ============================================================
 // 9. Сохранение / загрузка
 // ============================================================
 
+// Load читает инвентарь построчно.
+//
+// Политика загрузки: повреждённые строки НЕ прерывают загрузку — они
+// пропускаются, а все ошибки собираются и возвращаются объединёнными
+// через errors.Join. Так пользователь видит сразу все проблемы файла,
+// а валидные записи остаются доступны. Дубликаты ID также считаются
+// ошибкой и пропускаются (иначе FindByID/DeleteByID работали бы
+// непредсказуемо).
 func (inv *Inventory) Load(r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	var errs []error
+	seen := make(map[int]bool)
 	lineNo := 0
 	for scanner.Scan() {
 		lineNo++
@@ -345,6 +426,15 @@ func (inv *Inventory) Load(r io.Reader) error {
 			errs = append(errs, &ParseItemError{Line: lineNo, Value: line, Err: err})
 			continue
 		}
+		if seen[item.ID()] {
+			errs = append(errs, &ParseItemError{
+				Line:  lineNo,
+				Value: line,
+				Err:   fmt.Errorf("дубликат ID=%d", item.ID()),
+			})
+			continue
+		}
+		seen[item.ID()] = true
 		inv.Items = append(inv.Items, item)
 		if item.ID() > inv.nextID {
 			inv.nextID = item.ID()
@@ -428,13 +518,13 @@ func saveInventoryToFile(path string, inv *Inventory) (err error) {
 //
 // Ответы на вопросы задания:
 //
-//	1.Ошибка сломанного предмета — не паника: это штатное доменное
-//	  состояние, которое вызывающий может обработать. Panic
-//	  в Go — для программных ошибок, и он обрушил бы весь CLI.
-//	2.После panic(...) не выполнится return item.Use() — управление
-//	  сразу уйдёт в отложенные вызовы (defer), где сработает recover.
-//	3.Recover работает только во время раскрутки стека после panic,
-//	  поэтому он имеет смысл только внутри defer-функции.
+//  1. Ошибка сломанного предмета — не паника: это штатное доменное
+//     состояние, которое вызывающий может обработать. Panic
+//     в Go — для программных ошибок, и он обрушил бы весь CLI.
+//  2. После panic(...) не выполнится return item.Use() — управление
+//     сразу уйдёт в отложенные вызовы (defer), где сработает recover.
+//  3. Recover работает только во время раскрутки стека после panic,
+//     поэтому он имеет смысл только внутри defer-функции.
 func UseDangerousItem(item Item) (message string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -485,13 +575,15 @@ func cmdList(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "лишние аргументы: %v\n", fs.Args())
+		return 2
+	}
 
 	inv, err := loadInventoryFromFile(*path)
 	if err != nil {
 		fmt.Fprintf(stderr, "загрузка: %v\n", err)
-		if inv == nil {
-			return 1
-		}
+		return 1
 	}
 	if len(inv.Items) == 0 {
 		fmt.Fprintln(stdout, "инвентарь пуст")
@@ -512,11 +604,15 @@ func cmdAdd(args []string, stdout, stderr io.Writer) int {
 	name := fs.String("name", "", "название предмета")
 	weight := fs.Float64("weight", 0, "вес предмета")
 	damage := fs.Int("damage", 0, "урон (weapon)")
-	durability := fs.Int("durability", 1, "прочность (weapon)")
+	durability := fs.Int("durability", 1, "прочность (weapon/armor)")
 	defense := fs.Int("defense", 0, "защита (armor)")
 	effect := fs.String("effect", "", "эффект (potion)")
 	charges := fs.Int("charges", 1, "заряды (potion)")
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "лишние аргументы: %v\n", fs.Args())
 		return 2
 	}
 	if *name == "" {
@@ -527,14 +623,23 @@ func cmdAdd(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "флаг -weight должен быть > 0")
 		return 2
 	}
+	// Запрещаем разделители и переводы строк: иначе запись станет
+	// нечитаемой при следующей загрузке.
+	if strings.ContainsAny(*name, "|\n\r") {
+		fmt.Fprintln(stderr, "имя не должно содержать | или перевод строки")
+		return 2
+	}
+	if *kind == "potion" && strings.ContainsAny(*effect, "|\n\r") {
+		fmt.Fprintln(stderr, "эффект не должен содержать | или перевод строки")
+		return 2
+	}
 
 	inv, loadErr := loadInventoryFromFile(*path)
-	if inv == nil {
+	if loadErr != nil {
+		// Изменяющая команда не должна перезаписывать файл, если в нём
+		// есть повреждённые записи — иначе они будут потеряны.
 		fmt.Fprintf(stderr, "загрузка: %v\n", loadErr)
 		return 1
-	}
-	if loadErr != nil {
-		fmt.Fprintf(stderr, "предупреждение: %v\n", loadErr)
 	}
 
 	var item Item
@@ -542,7 +647,7 @@ func cmdAdd(args []string, stdout, stderr io.Writer) int {
 	case "weapon":
 		item = &Weapon{name: *name, weight: *weight, Damage: *damage, Durability: *durability}
 	case "armor":
-		item = &Armor{name: *name, weight: *weight, Defense: *defense}
+		item = &Armor{name: *name, weight: *weight, Defense: *defense, Durability: *durability}
 	case "potion":
 		item = &Potion{name: *name, weight: *weight, Effect: *effect, Charges: *charges}
 	default:
@@ -567,18 +672,19 @@ func cmdUse(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "лишние аргументы: %v\n", fs.Args())
+		return 2
+	}
 	if *id <= 0 {
 		fmt.Fprintln(stderr, "флаг -id обязателен")
 		return 2
 	}
 
 	inv, loadErr := loadInventoryFromFile(*path)
-	if inv == nil {
+	if loadErr != nil {
 		fmt.Fprintf(stderr, "загрузка: %v\n", loadErr)
 		return 1
-	}
-	if loadErr != nil {
-		fmt.Fprintf(stderr, "предупреждение: %v\n", loadErr)
 	}
 
 	item, ok := inv.FindByID(*id)
@@ -599,12 +705,13 @@ func cmdUse(args []string, stdout, stderr io.Writer) int {
 		}
 		return 1
 	}
-	fmt.Fprintln(stdout, msg)
 
+	// Сначала сохраняем, и только при успехе сообщаем об успехе.
 	if err := saveInventoryToFile(*path, inv); err != nil {
 		fmt.Fprintf(stderr, "сохранение: %v\n", err)
 		return 1
 	}
+	fmt.Fprintln(stdout, msg)
 	return 0
 }
 
@@ -616,18 +723,19 @@ func cmdDelete(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "лишние аргументы: %v\n", fs.Args())
+		return 2
+	}
 	if *id <= 0 {
 		fmt.Fprintln(stderr, "флаг -id обязателен")
 		return 2
 	}
 
 	inv, loadErr := loadInventoryFromFile(*path)
-	if inv == nil {
+	if loadErr != nil {
 		fmt.Fprintf(stderr, "загрузка: %v\n", loadErr)
 		return 1
-	}
-	if loadErr != nil {
-		fmt.Fprintf(stderr, "предупреждение: %v\n", loadErr)
 	}
 
 	if !inv.DeleteByID(*id) {
