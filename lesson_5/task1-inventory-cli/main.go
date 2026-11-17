@@ -52,7 +52,7 @@ type Item interface {
 // Storable — контракт сохранения/загрузки предмета (из ДЗ4).
 type Storable interface {
 	Serialize(w io.Writer) error
-	Deserialize(line string) error
+	Deserialize(r io.Reader) error
 }
 
 var (
@@ -90,15 +90,16 @@ func (w *Weapon) Use() (string, error) {
 }
 
 func (w *Weapon) Serialize(out io.Writer) error {
-	if _, err := fmt.Fprintf(out, "Weapon|%d|%s|%d|%d|%.2f\n",
+	if _, err := fmt.Fprintf(out, "Weapon|%d|%s|%d|%d|%v\n",
 		w.id, w.name, w.Damage, w.Durability, w.weight); err != nil {
 		return fmt.Errorf("Weapon: %w", err)
 	}
 	return nil
 }
 
-func (w *Weapon) Deserialize(line string) error {
-	parts := strings.Split(line, "|")
+func (w *Weapon) Deserialize(in io.Reader) error {
+	line, _ := bufio.NewReader(in).ReadString('\n')
+	parts := strings.Split(strings.TrimSpace(line), "|")
 	if len(parts) != 6 {
 		return fmt.Errorf("Weapon: ожидалось 6 полей, получено %d", len(parts))
 	}
@@ -148,15 +149,16 @@ func (a *Armor) Use() (string, error) {
 }
 
 func (a *Armor) Serialize(out io.Writer) error {
-	if _, err := fmt.Fprintf(out, "Armor|%d|%s|%d|%d|%.2f\n",
+	if _, err := fmt.Fprintf(out, "Armor|%d|%s|%d|%d|%v\n",
 		a.id, a.name, a.Defense, a.Durability, a.weight); err != nil {
 		return fmt.Errorf("Armor: %w", err)
 	}
 	return nil
 }
 
-func (a *Armor) Deserialize(line string) error {
-	parts := strings.Split(line, "|")
+func (a *Armor) Deserialize(in io.Reader) error {
+	line, _ := bufio.NewReader(in).ReadString('\n')
+	parts := strings.Split(strings.TrimSpace(line), "|")
 	if len(parts) != 6 {
 		return fmt.Errorf("Armor: ожидалось 6 полей, получено %d", len(parts))
 	}
@@ -206,15 +208,16 @@ func (p *Potion) Use() (string, error) {
 }
 
 func (p *Potion) Serialize(out io.Writer) error {
-	if _, err := fmt.Fprintf(out, "Potion|%d|%s|%s|%d|%.2f\n",
+	if _, err := fmt.Fprintf(out, "Potion|%d|%s|%s|%d|%v\n",
 		p.id, p.name, p.Effect, p.Charges, p.weight); err != nil {
 		return fmt.Errorf("Potion: %w", err)
 	}
 	return nil
 }
 
-func (p *Potion) Deserialize(line string) error {
-	parts := strings.Split(line, "|")
+func (p *Potion) Deserialize(in io.Reader) error {
+	line, _ := bufio.NewReader(in).ReadString('\n')
+	parts := strings.Split(strings.TrimSpace(line), "|")
 	if len(parts) != 6 {
 		return fmt.Errorf("Potion: ожидалось 6 полей, получено %d", len(parts))
 	}
@@ -392,7 +395,7 @@ func parseItemLine(line string) (Item, error) {
 	if !ok {
 		return nil, fmt.Errorf("тип %T не реализует Storable", item)
 	}
-	if err := s.Deserialize(line); err != nil {
+	if err := s.Deserialize(strings.NewReader(line + "\n")); err != nil {
 		return nil, err
 	}
 	return item, nil
@@ -411,39 +414,54 @@ func parseItemLine(line string) (Item, error) {
 // ошибкой и пропускаются (иначе FindByID/DeleteByID работали бы
 // непредсказуемо).
 func (inv *Inventory) Load(r io.Reader) error {
-	scanner := bufio.NewScanner(r)
+	br := bufio.NewReader(r)
 	var errs []error
 	seen := make(map[int]bool)
 	lineNo := 0
-	for scanner.Scan() {
+
+	for {
+		line, err := br.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				if strings.TrimSpace(line) != "" {
+					lineNo++
+					inv.parseLine(line, lineNo, seen, &errs)
+				}
+				break
+			}
+			errs = append(errs, fmt.Errorf("чтение файла: %w", err))
+			break
+		}
 		lineNo++
-		line := scanner.Text()
+		line = strings.TrimRight(line, "\r\n")
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		item, err := parseItemLine(line)
-		if err != nil {
-			errs = append(errs, &ParseItemError{Line: lineNo, Value: line, Err: err})
-			continue
-		}
-		if seen[item.ID()] {
-			errs = append(errs, &ParseItemError{
-				Line:  lineNo,
-				Value: line,
-				Err:   fmt.Errorf("дубликат ID=%d", item.ID()),
-			})
-			continue
-		}
-		seen[item.ID()] = true
-		inv.Items = append(inv.Items, item)
-		if item.ID() > inv.nextID {
-			inv.nextID = item.ID()
-		}
+		inv.parseLine(line, lineNo, seen, &errs)
 	}
-	if err := scanner.Err(); err != nil {
-		errs = append(errs, fmt.Errorf("чтение файла: %w", err))
-	}
+
 	return errors.Join(errs...)
+}
+
+func (inv *Inventory) parseLine(line string, lineNo int, seen map[int]bool, errs *[]error) {
+	item, err := parseItemLine(line)
+	if err != nil {
+		*errs = append(*errs, &ParseItemError{Line: lineNo, Value: line, Err: err})
+		return
+	}
+	if seen[item.ID()] {
+		*errs = append(*errs, &ParseItemError{
+			Line:  lineNo,
+			Value: line,
+			Err:   fmt.Errorf("дубликат ID=%d", item.ID()),
+		})
+		return
+	}
+	seen[item.ID()] = true
+	inv.Items = append(inv.Items, item)
+	if item.ID() > inv.nextID {
+		inv.nextID = item.ID()
+	}
 }
 
 func (inv *Inventory) Save(w io.Writer) error {
