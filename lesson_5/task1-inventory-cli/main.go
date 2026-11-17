@@ -49,7 +49,6 @@ type Item interface {
 	SetID(int)
 }
 
-// Storable — контракт сохранения/загрузки предмета (из ДЗ4).
 type Storable interface {
 	Serialize(w io.Writer) error
 	Deserialize(r io.Reader) error
@@ -68,12 +67,21 @@ var (
 // 4. Доменные типы
 // ============================================================
 
+func readLine(br *bufio.Reader) (string, error) {
+	return br.ReadString('\n')
+}
+
+func isLastLine(line string, err error) bool {
+	return errors.Is(err, io.EOF) && strings.TrimSpace(line) != ""
+}
+
 type Weapon struct {
 	id         int
 	name       string
 	weight     float64
 	Damage     int
 	Durability int
+	reader     *bufio.Reader
 }
 
 func (w *Weapon) Name() string    { return w.name }
@@ -98,7 +106,13 @@ func (w *Weapon) Serialize(out io.Writer) error {
 }
 
 func (w *Weapon) Deserialize(in io.Reader) error {
-	line, _ := bufio.NewReader(in).ReadString('\n')
+	if w.reader == nil {
+		w.reader = bufio.NewReader(in)
+	}
+	line, err := readLine(w.reader)
+	if err != nil && !isLastLine(line, err) {
+		return fmt.Errorf("Weapon: чтение строки: %w", err)
+	}
 	parts := strings.Split(strings.TrimSpace(line), "|")
 	if len(parts) != 6 {
 		return fmt.Errorf("Weapon: ожидалось 6 полей, получено %d", len(parts))
@@ -133,6 +147,7 @@ type Armor struct {
 	weight     float64
 	Defense    int
 	Durability int
+	reader     *bufio.Reader
 }
 
 func (a *Armor) Name() string    { return a.name }
@@ -157,7 +172,13 @@ func (a *Armor) Serialize(out io.Writer) error {
 }
 
 func (a *Armor) Deserialize(in io.Reader) error {
-	line, _ := bufio.NewReader(in).ReadString('\n')
+	if a.reader == nil {
+		a.reader = bufio.NewReader(in)
+	}
+	line, err := readLine(a.reader)
+	if err != nil && !isLastLine(line, err) {
+		return fmt.Errorf("Armor: чтение строки: %w", err)
+	}
 	parts := strings.Split(strings.TrimSpace(line), "|")
 	if len(parts) != 6 {
 		return fmt.Errorf("Armor: ожидалось 6 полей, получено %d", len(parts))
@@ -192,6 +213,7 @@ type Potion struct {
 	weight  float64
 	Effect  string
 	Charges int
+	reader  *bufio.Reader
 }
 
 func (p *Potion) Name() string    { return p.name }
@@ -216,7 +238,13 @@ func (p *Potion) Serialize(out io.Writer) error {
 }
 
 func (p *Potion) Deserialize(in io.Reader) error {
-	line, _ := bufio.NewReader(in).ReadString('\n')
+	if p.reader == nil {
+		p.reader = bufio.NewReader(in)
+	}
+	line, err := readLine(p.reader)
+	if err != nil && !isLastLine(line, err) {
+		return fmt.Errorf("Potion: чтение строки: %w", err)
+	}
 	parts := strings.Split(strings.TrimSpace(line), "|")
 	if len(parts) != 6 {
 		return fmt.Errorf("Potion: ожидалось 6 полей, получено %d", len(parts))
