@@ -86,7 +86,11 @@ func readLine(r io.Reader) (string, error) {
 		n, err := r.Read(buf[:])
 		if n == 1 {
 			if buf[0] == '\n' {
-				return sb.String(), nil
+				// Строка прочитана целиком. Если Read вернул '\n'
+				// вместе с ошибкой — не теряем её: возвращаем строку
+				// и эту ошибку. Вызывающий (через isLastLine) сам решит,
+				// что это последняя строка без завершающего '\n'.
+				return sb.String(), err
 			}
 			sb.WriteByte(buf[0])
 		}
@@ -457,7 +461,14 @@ func parseItemLine(line string) (Item, error) {
 func (inv *Inventory) Load(r io.Reader) error {
 	br := bufio.NewReader(r)
 	var errs []error
-	seen := make(map[int]bool)
+	// seen инициализируем уже загруженными ID, а не пустой картой:
+	// Load может вызываться на инвентаре, где предметы уже есть
+	// (например, повторная загрузка в тот же Inventory). Иначе ID из
+	// предыдущей загрузки не учитывались бы и появлялись дубликаты.
+	seen := make(map[int]bool, len(inv.Items))
+	for _, item := range inv.Items {
+		seen[item.ID()] = true
+	}
 	lineNo := 0
 
 	for {
