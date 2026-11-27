@@ -67,8 +67,33 @@ var (
 // 4. Доменные типы
 // ============================================================
 
-func readLine(br *bufio.Reader) (string, error) {
-	return br.ReadString('\n')
+// readLine читает ровно одну строку из r и возвращает её вместе с ошибкой.
+//
+// Предмет НЕ хранит ридер внутри себя: r приходит параметром в каждый вызов
+// Deserialize. Поэтому один и тот же предмет можно безопасно десериализовать
+// из разных источников — второй вызов прочитает из нового ридера, а не из
+// «запомненного» первого.
+//
+// Читаем по одному байту до '\n', не полагаясь на конкретный тип ридера
+// (никаких type-assertion на *bufio.Reader / *bytes.Buffer). Так мы не
+// забираем из потока лишние байты следующей записи: если на вход пришёл
+// общий поток, его владелец (например, Inventory.Load) сам решает, как
+// буферизовать чтение.
+func readLine(r io.Reader) (string, error) {
+	var sb strings.Builder
+	var buf [1]byte
+	for {
+		n, err := r.Read(buf[:])
+		if n == 1 {
+			if buf[0] == '\n' {
+				return sb.String(), nil
+			}
+			sb.WriteByte(buf[0])
+		}
+		if err != nil {
+			return sb.String(), err
+		}
+	}
 }
 
 func isLastLine(line string, err error) bool {
@@ -81,7 +106,6 @@ type Weapon struct {
 	weight     float64
 	Damage     int
 	Durability int
-	reader     *bufio.Reader
 }
 
 func (w *Weapon) Name() string    { return w.name }
@@ -106,10 +130,7 @@ func (w *Weapon) Serialize(out io.Writer) error {
 }
 
 func (w *Weapon) Deserialize(in io.Reader) error {
-	if w.reader == nil {
-		w.reader = bufio.NewReader(in)
-	}
-	line, err := readLine(w.reader)
+	line, err := readLine(in)
 	if err != nil && !isLastLine(line, err) {
 		return fmt.Errorf("Weapon: чтение строки: %w", err)
 	}
@@ -147,7 +168,6 @@ type Armor struct {
 	weight     float64
 	Defense    int
 	Durability int
-	reader     *bufio.Reader
 }
 
 func (a *Armor) Name() string    { return a.name }
@@ -172,10 +192,7 @@ func (a *Armor) Serialize(out io.Writer) error {
 }
 
 func (a *Armor) Deserialize(in io.Reader) error {
-	if a.reader == nil {
-		a.reader = bufio.NewReader(in)
-	}
-	line, err := readLine(a.reader)
+	line, err := readLine(in)
 	if err != nil && !isLastLine(line, err) {
 		return fmt.Errorf("Armor: чтение строки: %w", err)
 	}
@@ -213,7 +230,6 @@ type Potion struct {
 	weight  float64
 	Effect  string
 	Charges int
-	reader  *bufio.Reader
 }
 
 func (p *Potion) Name() string    { return p.name }
@@ -238,10 +254,7 @@ func (p *Potion) Serialize(out io.Writer) error {
 }
 
 func (p *Potion) Deserialize(in io.Reader) error {
-	if p.reader == nil {
-		p.reader = bufio.NewReader(in)
-	}
-	line, err := readLine(p.reader)
+	line, err := readLine(in)
 	if err != nil && !isLastLine(line, err) {
 		return fmt.Errorf("Potion: чтение строки: %w", err)
 	}
